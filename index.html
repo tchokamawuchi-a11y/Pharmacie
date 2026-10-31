@@ -115,7 +115,7 @@ const seed=()=>({meds:[
 {id:3,n:'Artéméther/Luméfantrine',c:'Antipaludique',q:60,s:20,p:2500,e:'2026-11-20'},
 {id:4,n:'Ibuprofène 400 mg',c:'Anti-inflammatoire',q:45,s:20,p:900,e:'2026-09-30'},
 {id:5,n:'Vitamine C 500 mg',c:'Vitamine',q:80,s:15,p:700,e:'2028-01-10'}],sales:[],nid:6,users:[{id:1,n:'Admin',pin:'1234',r:'admin'}],sup:[],ord:[],cli:[],rx:[]});
-let D={meds:[],sales:[],cli:[],sup:[],ord:[],rx:[],users:[],journal:[],tres:[],clo:[],cre:[],consu:[],ana:[],tar:[],eq:[]},db=null,boot='Chargement…';
+let D={meds:[],sales:[],cli:[],sup:[],ord:[],rx:[],users:[],journal:[],tres:[],clo:[],cre:[],consu:[],ana:[],tar:[],eq:[],per:[],sal:[]},db=null,boot='Chargement…';
 
 
 const save=()=>{};
@@ -196,6 +196,18 @@ const tarif=()=>(D.tar.find(x=>x.id==='ana')||{}).p||{};
 const ana=()=>`<div class='bar'><button class='b' id='aan2'>Nouveau reçu d’analyses</button></div>`+table(['Date','Patient','Analyses','Montant','Par',''],[...D.ana].reverse().slice(0,200).map(x=>`<tr><td>${new Date(x.d).toLocaleString('fr-FR')}</td><td><b>${esc(nm('cli',x.c))}</b></td><td>${esc(x.r.map(y=>y.n).join(', '))}</td><td>${F(x.m)}</td><td>${esc(x.u||'')}</td><td><button class='b g s' data-bl='${x.id}'>Reçu</button>${adm()?` <button class='b d s' data-xa='${x.id}'>Annuler</button>`:''}</td></tr>`),'Aucun reçu d’analyses.');
 function inviter(){ask('Ajouter un employ\u00e9',[{l:'Nom'},{l:'Code PIN (4 caract\u00e8res minimum)',t:'password'},{l:'R\u00f4le',o:[['vendeur','Vendeur'],['admin','Administrateur']]}],v=>{if(v[1].length>=4){LU.add(v[0].trim(),v[1],v[2]==='admin');render()}})}
 const team=()=>`<div class='bar'><button class='b' id='binv'>Ajouter un employ\u00e9</button><button class='b g' id='bsave'>Sauvegarder les donn\u00e9es</button><button class='b g' id='brest'>Restaurer une sauvegarde</button></div>`+table(['Nom','R\u00f4le',''],LU.users().map(u=>`<tr><td><b>${esc(u.name)}</b></td><td>${u.admin?'Administrateur':'Vendeur'}</td><td><button class='b g s' data-lpin='${esc(u.name)}'>Changer le PIN</button>${u.name!==me.n?` <button class='b d s' data-ldel='${esc(u.name)}'>Supprimer</button>`:''}</td></tr>`),'')+`<p style='color:var(--mu)'>Les donn\u00e9es sont enregistr\u00e9es sur cet appareil uniquement. Faites une sauvegarde chaque semaine et gardez le fichier en lieu s\u00fbr (cl\u00e9 USB). Le code PIN prot\u00e8ge seulement contre un usage ordinaire.</p>`;
+function fiche(s){
+ if(!s)return;
+ const per=new Date(s.mo+'-15').toLocaleDateString('fr-FR',{month:'long',year:'numeric'}),row=(a,b)=>`<tr><td style='padding:6px 4px;border-bottom:1px solid #999'>${a}</td><td style='padding:6px 4px;border-bottom:1px solid #999;text-align:right'>${b}</td></tr>`;
+ const html=`<div style='font:13px sans-serif;color:#000'><div style='text-align:center'><h2 style='margin:0'>CMS SAIT REGIS</h2>Kpètè-Maflo – Tél : 98844871 / 70309325<h3 style='margin:12px 0 2px'>FICHE DE PAIE</h3>Période : ${per}<br><small>N° ${String(s.id).slice(-6)}</small></div><p>Employé : <b>${esc(s.n)}</b></p><table style='min-width:0;width:100%;border-collapse:collapse'>${row('Période',per)}${row('<b>Montant net payé</b>','<b>'+F(s.m)+'</b>')}${row('Date de paiement',new Date(s.d).toLocaleDateString('fr-FR'))}${row('Payé par',esc(s.u||''))}</table><p style='margin-top:14px'>Je soussigné(e) <b>${esc(s.n)}</b> reconnais avoir reçu la somme de <b>${F(s.m)}</b> au titre du salaire de ${per}.</p><p style='margin-top:36px'>Signature de l’employé : ____________ <span style='float:right'>Signature et cachet de l’employeur : ____________</span></p></div>`;
+ $('#rpb').innerHTML=html;
+ $('#rpp').onclick=()=>{try{window.print()}catch(e){}};
+ $('#rps').onclick=async()=>{const dl=window.claude?await claude.use('downloads'):null;if(dl)try{await dl.save({filename:'fiche-paie-'+String(s.id).slice(-6)+'.html',data:new Blob([`<!doctype html><meta charset=utf-8><title>Fiche de paie</title><body style='max-width:190mm;margin:auto'>${html}`],{type:'text/html'})})}catch(e){}};
+ $('#rpd').showModal();
+}
+let pm=today.slice(0,7);
+const paie=()=>{const pay=D.sal.filter(x=>x.mo===pm),tot=D.per.reduce((a,p)=>a+p.m,0),done=pay.reduce((a,x)=>a+x.m,0);
+ return `<div class='bar'><input type='month' id='pmo' value='${pm}'><button class='b' id='apr'>Ajouter un employé</button></div><section class='st'><div class='k'><b>${F(tot)}</b><span>Masse salariale mensuelle</span></div><div class='k'><b>${F(done)}</b><span>Déjà payé pour ce mois</span></div><div class='k ${tot>done?'w2':''}'><b>${F(Math.max(0,tot-done))}</b><span>Reste à payer</span></div></section>`+table(['Employé','Salaire mensuel','Ce mois',''],D.per.map(p=>{const s=pay.find(x=>x.p===p.id);return`<tr><td><b>${esc(p.n)}</b></td><td>${F(p.m)}</td><td>${s?tag(1,'Payé le '+new Date(s.d).toLocaleDateString('fr-FR'),''):tag(0,'','À payer')}</td><td style='white-space:nowrap'>${s?`<button class='b g s' data-fsl='${s.id}'>Fiche de paie</button> <button class='b g s' data-xsl='${s.id}'>Annuler le paiement</button>`:`<button class='b s' data-psl='${p.id}'>Payer le salaire</button>`} <button class='b g s' data-mpr='${p.id}'>Modifier</button> <button class='b d s' data-dpr='${p.id}'>Supprimer</button></td></tr>`}),'Aucun employé enregistré. Touchez « Ajouter un employé ».')};
 const cdue=()=>D.cre.reduce((a,x)=>a+(x.r>0?x.r:0),0),clate=()=>D.cre.reduce((a,x)=>a+(x.r>0&&Date.now()-new Date(x.d)>30*864e5?x.r:0),0);
 let cr=false;
 const cre=()=>{const o=D.cre.filter(x=>x.r>0),tot=o.reduce((a,x)=>a+x.r,0);
@@ -220,7 +232,7 @@ document.body.insertAdjacentHTML('beforeend',`<dialog id='gd'><form method='dial
 
 const adm=()=>me&&me.r==='admin';
 const nm=(a,id)=>(D[a].find(x=>x.id===id)||{n:'(supprimé)'}).n;
-const TABS=[['stock','Stock'],['vente','Vente'],['hist','Historique'],['cli','Clients'],['rx','Ordonnances'],['cons','Consultations'],['ana','Analyses'],['ord','Commandes',1],['sup','Fournisseurs',1],['jr','Journal',1],['inv','Inventaire',1],['tres','Trésorerie',1],['rap','Rapport',1],['cre','Créances',1],['team','Équipe',1]];
+const TABS=[['stock','Stock'],['vente','Vente'],['hist','Historique'],['cli','Clients'],['rx','Ordonnances'],['cons','Consultations'],['ana','Analyses'],['ord','Commandes',1],['sup','Fournisseurs',1],['jr','Journal',1],['inv','Inventaire',1],['tres','Trésorerie',1],['rap','Rapport',1],['cre','Créances',1],['paie','Salaires',1],['team','Équipe',1]];
 function ask(title,fields,cb,ok='Enregistrer'){
  $('#gf').innerHTML=`<h3 style='margin:0 0 6px'>${title}</h3>`+fields.map((f,i)=>`<label>${f.l}</label>`+(f.o?`<select id='g${i}'>${f.o.map(o=>`<option value='${o[0]}'>${esc(o[1])}</option>`).join('')}</select>`:`<input id='g${i}' type='${f.t||'text'}' ${f.t==='number'?'min='+(f.z?0:1):''} ${f.n?'':'required'}>`)).join('')+`<div style='display:flex;gap:8px;justify-content:flex-end;margin-top:14px'><button type='button' class='b g' id='gx'>Annuler</button><button class='b'>${ok}</button></div>`;
  $('#gx').onclick=()=>$('#gd').close();
@@ -274,7 +286,7 @@ function render(){
  $('#who').textContent=me?me.n+(adm()?' (administrateur)':' (vendeur)'):'';
  if(!me){$('#st').innerHTML='';$('#nav').innerHTML='';$('#main').innerHTML=`<div class='pn em'>${boot}</div>`;return}
  $('#nav').innerHTML=TABS.filter(t=>!t[2]||adm()).map(t=>`<button data-v='${t[0]}' class='${t[0]===view?'on':''}'>${t[1]}</button>`).join('');
- $('#main').innerHTML={stock,vente,hist,cli,rx,ord,sup,eq,jr,inv,tres,rap,cre,cons,ana,team}[view]();
+ $('#main').innerHTML={stock,vente,hist,cli,rx,ord,sup,eq,jr,inv,tres,rap,cre,cons,ana,team,paie}[view]();
  const s=$('#sq')||$('#vq');
  if(s)s.oninput=e=>{q=e.target.value;const p=e.target.selectionStart;render();const n=$('#sq')||$('#vq');n.focus();n.setSelectionRange(p,p)};
 }
@@ -322,6 +334,7 @@ $('#xl').onclick=async()=>{
  add('Commandes',D.ord.map(o=>({Date:o.d,Fournisseur:nm('sup',o.s),Médicament:nm('meds',o.m),Quantité:o.k,Montant:o.a||0,Paiement:o.a?(o.p?'Payée':'À payer'):'',État:o.ok?'Reçue':'En attente'})));
  add('Ordonnances',D.rx.map(r=>({Date:r.d,Patient:nm('cli',r.c),Médecin:r.dr,Médicament:nm('meds',r.m),Quantité:r.k,État:r.ok?'Délivrée':'À délivrer'})));
  add('Analyses',D.ana.map(x=>({Date:x.d,Patient:nm('cli',x.c),Prescripteur:x.dr,Résultats:x.r.map(y=>y.n+(y.v?' : '+y.v+' '+y.u:'')).join(' ; '),Montant:x.m,Employé:x.u})));
+ add('Salaires',D.sal.map(x=>({Mois:x.mo,Employé:x.n,Montant:x.m,Date:x.d,Par:x.u})));
  add('Consultations',D.consu.map(x=>({Date:x.d,Patient:nm('cli',x.c),Motif:x.mot,'Température':x.tp,Tension:x.ta,Poids:x.pd,Montant:x.m,Employé:x.u})));
  add('Créances',D.cre.map(x=>({Date:x.d,Client:nm('cli',x.c),Détail:x.l,Montant:x.m,'Reste dû':x.r})));
  add('Clôtures',D.clo.map(c=>({Date:c.day,Fond:c.fl,Théorique:c.th,Compté:c.cp,Écart:c.e,Employé:c.u})));
@@ -333,7 +346,7 @@ $('#xl').onclick=async()=>{
 $('#main').addEventListener('input',e=>{const t=e.target;
  if(t.id==='iq'){const v=t.value.toLowerCase();document.querySelectorAll('#main tr[data-n]').forEach(r=>r.hidden=!r.dataset.n.includes(v))}
  else if(t.dataset.ic){const m=D.meds.find(x=>x.id===+t.dataset.ic);ic[m.id]=t.value;document.getElementById('ie'+m.id).textContent=t.value===''?'':t.value-m.q}});
-$('#main').addEventListener('change',e=>{if(e.target.id==='vc'){cl=+e.target.value;render()}if(e.target.id==='vcr')cr=e.target.checked;if(e.target.id==='rk'&&e.target.value){rk=String(e.target.value);render()}});
+$('#main').addEventListener('change',e=>{if(e.target.id==='vc'){cl=+e.target.value;render()}if(e.target.id==='vcr')cr=e.target.checked;if(e.target.id==='rk'&&e.target.value){rk=String(e.target.value);render()}if(e.target.id==='pmo'&&e.target.value){pm=e.target.value;render()}});
 $('#main').addEventListener('click',e=>{
  const t=e.target,d=t.dataset,id=t.id,meds=()=>D.meds.map(m=>[m.id,m.n]);
  const del=(a,i,m)=>yes(m,()=>{log('Suppression ('+a+')',nm(a,i));dele(a,i)});
@@ -358,6 +371,12 @@ $('#main').addEventListener('click',e=>{
  else if(d.enc){const x=D.cre.find(z=>z.id===+d.enc);ask('Encaisser un règlement',[{l:`Montant encaissé (reste dû : ${F(x.r)})`,t:'number'}],v=>{const a=Math.min(+v[0],x.r),i=nid();upd('cre',x.id,{r:x.r-a,h:[...(x.h||[]),{d:new Date().toISOString(),m:a,u:me.n}]});put('tres',i,{id:i,d:new Date().toISOString(),t:'in',l:'Règlement créance : '+nm('cli',x.c),m:a,u:me.n});log('Règlement de créance',nm('cli',x.c)+' : '+F(a))})}
  else if(d.tk)ticket(D.consu.find(x=>x.id===+d.tk));
  else if(id==='acn'){if(need('cli',`Ajoutez d'abord le patient dans l'onglet Clients`))ask('Nouvelle consultation',[{l:'Patient',o:D.cli.map(c=>[c.id,c.n])},{l:'Motif de la consultation'},{l:'Température (°C)',n:1},{l:'Tension (ex. 12/8)',n:1},{l:'Poids (kg)',n:1},{l:'Montant (FCFA)',t:'number',z:1}],v=>{const i=nid(),s={id:i,d:new Date().toISOString(),c:+v[0],mot:v[1],tp:v[2],ta:v[3],pd:v[4],m:+v[5],u:me.n};put('consu',i,s);if(s.m>0){const k=nid();put('tres',k,{id:k,d:s.d,t:'in',l:'Consultation : '+nm('cli',s.c),m:s.m,u:me.n})}log('Consultation',nm('cli',s.c)+' : '+s.mot);ticket(s)})}
+ else if(id==='apr')ask('Ajouter un employé (salaire)',[{l:'Nom'},{l:'Salaire mensuel (FCFA)',t:'number'}],v=>{const i=nid();put('per',i,{id:i,n:v[0].trim(),m:+v[1]});log('Employé enregistré (salaire)',v[0].trim())});
+ else if(d.mpr){const p=D.per.find(x=>x.id===+d.mpr);ask('Modifier le salaire de '+esc(p.n),[{l:'Nouveau salaire mensuel (FCFA)',t:'number'}],v=>{upd('per',p.id,{m:+v[0]});log('Salaire modifié',p.n+' : '+F(+v[0]))})}
+ else if(d.dpr){const p=D.per.find(x=>x.id===+d.dpr);yes('Supprimer '+esc(p.n)+' de la liste des salaires ?',()=>{dele('per',p.id);log('Employé retiré des salaires',p.n)})}
+ else if(d.psl){const p=D.per.find(x=>x.id===+d.psl);yes(`Payer le salaire de ${esc(p.n)} (${F(p.m)}) pour ${pm} ? Une dépense sera enregistrée dans la Trésorerie.`,()=>{const i=nid(),k=nid(),dt=new Date().toISOString();put('sal',i,{id:i,p:p.id,n:p.n,mo:pm,m:p.m,d:dt,u:me.n,t:k});put('tres',k,{id:k,d:dt,t:'out',l:'Salaire : '+p.n+' – '+pm,m:p.m,u:me.n});log('Salaire payé',p.n+' – '+pm+' : '+F(p.m))})}
+ else if(d.fsl)fiche(D.sal.find(x=>x.id===+d.fsl));
+ else if(d.xsl){const s=D.sal.find(x=>x.id===+d.xsl);yes(`Annuler le paiement du salaire de ${esc(s.n)} (${s.mo}) ? La dépense sera retirée de la Trésorerie.`,()=>{if(s.t)dele('tres',s.t);dele('sal',s.id);log('Paiement de salaire annulé',s.n+' – '+s.mo+' : '+F(s.m))})}
  else if(id==='binv')inviter();
  else if(id==='aan2'){if(need('cli',`Ajoutez d'abord le patient dans l'onglet Clients`))askAna()}
  else if(d.bl)bulletin(D.ana.find(x=>x.id===+d.bl));
@@ -389,7 +408,7 @@ $('#main').addEventListener('click',e=>{
   const u=window.claude?await claude.use('user'):null;db=window.claude?await claude.use('db'):null;
   if(!u||!db){boot='Ouvrez cette page depuis claude.ai, connecté à votre compte, pour accéder à la pharmacie.';return render()}
   const v=await u.me();me={n:v.name||'Employé',r:v.canEdit?'admin':'vendeur'};if(v.id)ref('eq',v.id).set({id:v.id,n:me.n,r:me.r,d:new Date().toISOString()}).catch(()=>{});
-  ['meds','sales','cli','sup','ord','rx','cre','consu','ana','tar',...(me.r==='admin'?['journal','tres','clo','eq']:[])].forEach(c=>db.collection(c).onSnapshot(s=>{D[c]=s.docs.map(x=>x.data()).sort((a,b)=>String(a.d||a.n||'').localeCompare(String(b.d||b.n||'')));const a=document.activeElement;a&&a.matches('#main input,#main select')?stats():render()},er));
+  ['meds','sales','cli','sup','ord','rx','cre','consu','ana','tar',...(me.r==='admin'?['journal','tres','clo','eq','per','sal']:[])].forEach(c=>db.collection(c).onSnapshot(s=>{D[c]=s.docs.map(x=>x.data()).sort((a,b)=>String(a.d||a.n||'').localeCompare(String(b.d||b.n||'')));const a=document.activeElement;a&&a.matches('#main input,#main select')?stats():render()},er));
   render();
  }catch(e){boot='Connexion impossible : '+(e.message||e.code);render()}
 })();
