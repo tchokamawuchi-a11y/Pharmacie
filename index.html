@@ -209,6 +209,29 @@ function bon(L,t){
  $('#rps').onclick=async()=>{const dl=window.claude?await claude.use('downloads'):null;if(dl)try{await dl.save({filename:'commande-'+today+'.html',data:new Blob([`<!doctype html><meta charset=utf-8><title>${t}</title><body style='max-width:190mm;margin:auto'>${html}`],{type:'text/html'})})}catch(e){}};
  $('#rpd').showModal();
 }
+let bm='mois',bk=today.slice(0,4);
+const benef=()=>{
+ const L=bm==='mois'?7:4,g={},ok=d=>bm==='an'||d.startsWith(bk),A=(d,f,v)=>{const k=d.slice(0,L);(g[k]=g[k]||{r:0,a:0,s:0,o:0})[f]+=v};
+ D.sales.forEach(s=>{if(ok(s.d))A(s.d,'r',s.cr?0:s.t)});
+ D.tres.forEach(x=>{if(!ok(x.d))return;if(x.t==='in')A(x.d,'r',x.m);else A(x.d,/^Paiement commande/.test(x.l)?'a':/^Salaire :/.test(x.l)?'s':'o',x.m)});
+ let ks=Object.keys(g).sort();
+ if(bm==='mois'){ks=[];for(let i=1;i<=12;i++)ks.push(bk+'-'+String(i).padStart(2,'0'))}
+ const R=ks.map(k=>{const v=g[k]||{r:0,a:0,s:0,o:0};return{k,...v,b:v.r-v.a-v.s-v.o}});
+ const T=R.reduce((t,x)=>({r:t.r+x.r,a:t.a+x.a,s:t.s+x.s,o:t.o+x.o,b:t.b+x.b}),{r:0,a:0,s:0,o:0,b:0});
+ return{R,T,lab:k=>bm==='mois'?new Date(k+'-15').toLocaleDateString('fr-FR',{month:'long'}):k}
+};
+const benRows=(R,T,lab)=>R.map(x=>`<tr><td style='text-transform:capitalize'>${lab(x.k)}</td><td>${F(x.r)}</td><td>${F(x.a)}</td><td>${F(x.s)}</td><td>${F(x.o)}</td><td><b style='color:${x.b<0?'var(--er)':'inherit'}'>${F(x.b)}</b></td></tr>`).concat([`<tr><td><b>Total</b></td><td><b>${F(T.r)}</b></td><td><b>${F(T.a)}</b></td><td><b>${F(T.s)}</b></td><td><b>${F(T.o)}</b></td><td><b>${F(T.b)}</b></td></tr>`]);
+const BH=['Période','Recettes','Achats de marchandises','Salaires','Autres dépenses','Bénéfice net'];
+const ben=()=>{const{R,T,lab}=benef();
+ return `<div class='bar'><button class='b ${bm==='mois'?'':'g'}' data-bm='mois'>Bénéfices mensuels</button><button class='b ${bm==='an'?'':'g'}' data-bm='an'>Bénéfices annuels</button>${bm==='mois'?`<input type='number' id='bk' value='${bk}' min='2020' max='2100' style='width:100px'>`:''}<button class='b g' id='pbn'>Imprimer</button></div><section class='st'><div class='k'><b>${F(T.r)}</b><span>Recettes</span></div><div class='k'><b>${F(T.a+T.s+T.o)}</b><span>Dépenses (achats, salaires, autres)</span></div><div class='k ${T.b<0?'e2':''}'><b>${F(T.b)}</b><span>Bénéfice net${bm==='mois'?' de '+bk:''}</span></div></section>`+table(BH,benRows(R,T,lab),'Aucune donnée.')+`<p style='color:var(--mu)'>Calcul sur l’argent réellement encaissé et dépensé : une vente à crédit compte quand le client paie, un achat de marchandises quand vous payez le fournisseur. Ce n’est pas une marge commerciale, car le prix d’achat de chaque produit n’est pas enregistré.</p>`};
+function printBen(){
+ const{R,T,lab}=benef(),tt=bm==='mois'?'BÉNÉFICES MENSUELS – '+bk:'BÉNÉFICES ANNUELS';
+ const html=`<div style='font:13px sans-serif;color:#000'><div style='text-align:center'><h2 style='margin:0'>SAINT RÉGIS</h2>Kpètè-Maflo – Tél : 98844871 / 70309325<h3 style='margin:12px 0 2px'>${tt}</h3><small>Édité le ${new Date().toLocaleDateString('fr-FR')} par ${esc(me.n)}</small></div><table style='min-width:0;width:100%;border-collapse:collapse;margin-top:12px'><tr>${BH.map((h,i)=>`<th style='text-align:${i?'right':'left'};border-bottom:1px solid #000;font-size:12px'>${h}</th>`).join('')}</tr>${benRows(R,T,lab).join('').replace(/<td>/g,"<td style='padding:5px 3px;border-bottom:1px solid #999;text-align:right'>").replace(/<td style='text-transform:capitalize'>/g,"<td style='padding:5px 3px;border-bottom:1px solid #999;text-transform:capitalize'>")}</table><p style='margin-top:10px;font-size:12px'>Calcul sur l’argent encaissé et dépensé (hors marge commerciale).</p><p style='margin-top:30px'>Signature : ____________</p></div>`;
+ $('#rpb').innerHTML=html;
+ $('#rpp').onclick=()=>{try{window.print()}catch(e){}};
+ $('#rps').onclick=async()=>{const dl=window.claude?await claude.use('downloads'):null;if(dl)try{await dl.save({filename:'benefices-'+(bm==='mois'?bk:'annuels')+'.html',data:new Blob([`<!doctype html><meta charset=utf-8><title>Bénéfices</title><body style='max-width:190mm;margin:auto'>${html}`],{type:'text/html'})})}catch(e){}};
+ $('#rpd').showModal();
+}
 function listeCmd(){
  const L=D.meds.filter(m=>m.q<=m.s).sort((a,b)=>a.n.localeCompare(b.n));
  if(!L.length)return ask('Aucun produit en dessous du seuil d’alerte',[],()=>{},'OK');
@@ -264,7 +287,7 @@ document.body.insertAdjacentHTML('beforeend',`<dialog id='gd'><form method='dial
 
 const adm=()=>me&&me.r==='admin';
 const nm=(a,id)=>(D[a].find(x=>x.id===id)||{n:'(supprimé)'}).n;
-const TABS=[['stock','Stock'],['vente','Vente'],['hist','Historique'],['cli','Clients'],['rx','Ordonnances'],['cons','Consultations'],['ana','Analyses'],['ord','Commandes',1],['sup','Fournisseurs',1],['jr','Journal',1],['inv','Inventaire',1],['tres','Trésorerie',1],['rap','Rapport',1],['cre','Créances',1],['paie','Salaires',1],['team','Équipe',1]];
+const TABS=[['stock','Stock'],['vente','Vente'],['hist','Historique'],['cli','Clients'],['rx','Ordonnances'],['cons','Consultations'],['ana','Analyses'],['ord','Commandes',1],['sup','Fournisseurs',1],['jr','Journal',1],['inv','Inventaire',1],['tres','Trésorerie',1],['rap','Rapport',1],['ben','Bénéfices',1],['cre','Créances',1],['paie','Salaires',1],['team','Équipe',1]];
 function ask(title,fields,cb,ok='Enregistrer'){
  $('#gf').innerHTML=`<h3 style='margin:0 0 6px'>${title}</h3>`+fields.map((f,i)=>`<label>${f.l}</label>`+(f.o?`<select id='g${i}'>${f.o.map(o=>`<option value='${o[0]}'>${esc(o[1])}</option>`).join('')}</select>`:`<input id='g${i}' type='${f.t||'text'}' ${f.t==='number'?'min='+(f.z?0:1):''} ${f.n?'':'required'}>`)).join('')+`<div style='display:flex;gap:8px;justify-content:flex-end;margin-top:14px'><button type='button' class='b g' id='gx'>Annuler</button><button class='b'>${ok}</button></div>`;
  $('#gx').onclick=()=>$('#gd').close();
@@ -318,7 +341,7 @@ function render(){
  $('#who').textContent=me?me.n+(adm()?' (administrateur)':' (vendeur)'):'';
  if(!me){$('#st').innerHTML='';$('#nav').innerHTML='';$('#main').innerHTML=`<div class='pn em'>${boot}</div>`;return}
  $('#nav').innerHTML=TABS.filter(t=>!t[2]||adm()).map(t=>`<button data-v='${t[0]}' class='${t[0]===view?'on':''}'>${t[1]}</button>`).join('');
- $('#main').innerHTML={stock,vente,hist,cli,rx,ord,sup,eq,jr,inv,tres,rap,cre,cons,ana,team,paie}[view]();
+ $('#main').innerHTML={stock,vente,hist,cli,rx,ord,sup,eq,jr,inv,tres,rap,cre,cons,ana,team,paie,ben}[view]();
  const s=$('#sq')||$('#vq');
  if(s)s.oninput=e=>{q=e.target.value;const p=e.target.selectionStart;render();const n=$('#sq')||$('#vq');n.focus();n.setSelectionRange(p,p)};
 }
@@ -378,7 +401,7 @@ $('#xl').onclick=async()=>{
 $('#main').addEventListener('input',e=>{const t=e.target;
  if(t.id==='iq'){const v=t.value.toLowerCase();document.querySelectorAll('#main tr[data-n]').forEach(r=>r.hidden=!r.dataset.n.includes(v))}
  else if(t.dataset.ic){const m=D.meds.find(x=>x.id===+t.dataset.ic);ic[m.id]=t.value;document.getElementById('ie'+m.id).textContent=t.value===''?'':t.value-m.q}});
-$('#main').addEventListener('change',e=>{if(e.target.id==='vc'){cl=+e.target.value;render()}if(e.target.id==='vcr')cr=e.target.checked;if(e.target.id==='rk'&&e.target.value){rk=String(e.target.value);render()}if(e.target.id==='pmo'&&e.target.value){pm=e.target.value;render()}});
+$('#main').addEventListener('change',e=>{if(e.target.id==='vc'){cl=+e.target.value;render()}if(e.target.id==='vcr')cr=e.target.checked;if(e.target.id==='rk'&&e.target.value){rk=String(e.target.value);render()}if(e.target.id==='pmo'&&e.target.value){pm=e.target.value;render()}if(e.target.id==='bk'&&e.target.value){bk=String(e.target.value);render()}});
 $('#main').addEventListener('click',e=>{
  const t=e.target,d=t.dataset,id=t.id,meds=()=>D.meds.map(m=>[m.id,m.n]);
  const del=(a,i,m)=>yes(m,()=>{log('Suppression ('+a+')',nm(a,i));dele(a,i)});
@@ -409,6 +432,8 @@ $('#main').addEventListener('click',e=>{
  else if(d.psl){const p=D.per.find(x=>x.id===+d.psl);yes(`Payer le salaire de ${esc(p.n)} (${F(p.m)}) pour ${pm} ? Une dépense sera enregistrée dans la Trésorerie.`,()=>{const i=nid(),k=nid(),dt=new Date().toISOString();put('sal',i,{id:i,p:p.id,n:p.n,mo:pm,m:p.m,d:dt,u:me.n,t:k});put('tres',k,{id:k,d:dt,t:'out',l:'Salaire : '+p.n+' – '+pm,m:p.m,u:me.n});log('Salaire payé',p.n+' – '+pm+' : '+F(p.m))})}
  else if(d.bon)bon([D.ord.find(x=>x.id===+d.bon)],'FICHE DE COMMANDE');
  else if(id==='bonall')bon(D.ord.filter(o=>!o.ok),'COMMANDES EN ATTENTE');
+ else if(d.bm){bm=d.bm;render()}
+ else if(id==='pbn')printBen();
  else if(id==='lcm')listeCmd();
  else if(d.bcm)bonCmd(D.ord.find(x=>x.id===+d.bcm));
  else if(d.fsl)fiche(D.sal.find(x=>x.id===+d.fsl));
