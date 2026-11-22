@@ -55,7 +55,7 @@ dialog{max-height:90vh;overflow:auto}nav{overflow-x:auto}nav button{white-space:
 <label>Catégorie</label><select id="f_c"><option>Antalgique</option><option>Antibiotique</option><option>Antipaludique</option><option>Anti-inflammatoire</option><option>Vitamine</option><option>Autre</option></select>
 <label>Quantité en stock</label><input id="f_q" type="number" min="0" required>
 <label>Seuil d'alerte</label><input id="f_s" type="number" min="0" required>
-<label>Prix unitaire (FCFA)</label><input id="f_p" type="number" min="0" required>
+<label>Prix unitaire (FCFA)</label><input id="f_p" type="number" min="0" required><label>Prix d'achat unitaire (FCFA, facultatif)</label><input id="f_a" type="number" min="0">
 <label>Date d'expiration</label><input id="f_e" type="date" required>
 <div style="display:flex;gap:8px;justify-content:flex-end;margin-top:14px"><button type="button" class="b g" id="cx">Annuler</button><button class="b" id="ok">Enregistrer</button></div>
 </form></dialog>
@@ -221,12 +221,28 @@ const benef=()=>{
  return{R,T,lab:k=>bm==='mois'?new Date(k+'-15').toLocaleDateString('fr-FR',{month:'long'}):k}
 };
 const benRows=(R,T,lab)=>R.map(x=>`<tr><td style='text-transform:capitalize'>${lab(x.k)}</td><td>${F(x.r)}</td><td>${F(x.a)}</td><td>${F(x.s)}</td><td>${F(x.o)}</td><td><b style='color:${x.b<0?'var(--er)':'inherit'}'>${F(x.b)}</b></td></tr>`).concat([`<tr><td><b>Total</b></td><td><b>${F(T.r)}</b></td><td><b>${F(T.a)}</b></td><td><b>${F(T.s)}</b></td><td><b>${F(T.o)}</b></td><td><b>${F(T.b)}</b></td></tr>`]);
+const marge=()=>{
+ const L=bm==='mois'?7:4,g={},ok=d=>bm==='an'||d.startsWith(bk),A=(d,f,v)=>{const k=d.slice(0,L);(g[k]=g[k]||{v:0,c:0,r:0,x:0})[f]+=v};let nx=0;
+ D.sales.forEach(s=>{if(!ok(s.d))return;if(s.i.every(i=>typeof i.a==='number')){A(s.d,'v',s.t);A(s.d,'c',s.i.reduce((t,i)=>t+i.k*i.a,0))}else nx++});
+ D.tres.forEach(x=>{if(!ok(x.d))return;if(x.t==='in'){if(!/^Règlement créance/.test(x.l))A(x.d,'r',x.m)}else if(!/^Paiement commande/.test(x.l))A(x.d,'x',x.m)});
+ let ks=Object.keys(g).sort();if(bm==='mois'){ks=[];for(let i=1;i<=12;i++)ks.push(bk+'-'+String(i).padStart(2,'0'))}
+ const rows=ks.map(k=>{const t=g[k]||{v:0,c:0,r:0,x:0};return{k,...t,m:t.v-t.c,b:t.v-t.c+t.r-t.x}});
+ const T=rows.reduce((a,x)=>({v:a.v+x.v,c:a.c+x.c,m:a.m+x.m,r:a.r+x.r,x:a.x+x.x,b:a.b+x.b}),{v:0,c:0,m:0,r:0,x:0,b:0});
+ return{rows,T,nx}
+};
+const MH=['Période','Ventes','Coût d’achat','Marge brute','Autres recettes','Salaires et autres dépenses','Bénéfice réel'];
+const mRows=(M,lab)=>M.rows.map(x=>[lab(x.k),F(x.v),F(x.c),F(x.m),F(x.r),F(x.x),F(x.b)]).concat([['Total',F(M.T.v),F(M.T.c),F(M.T.m),F(M.T.r),F(M.T.x),F(M.T.b)]]);
+let pq={};
+const pa=()=>`<div class='bar'><input id='paq' placeholder='Rechercher un produit'><button class='b' id='pasv'>Enregistrer les prix d’achat</button></div><p style='color:var(--mu);margin:0 0 8px'>Saisissez le prix d’achat unitaire de chaque produit. Laissez vide si vous ne le connaissez pas encore.</p>`+table(['Produit','Prix de vente','Prix d’achat','Marge'],D.meds.map(m=>{const v=pq[m.id]!==undefined?pq[m.id]:(m.a??''),mg=v!==''&&m.p?Math.round((m.p-v)/m.p*100)+' %':'';return`<tr data-n='${esc(m.n.toLowerCase())}'><td>${esc(m.n)}</td><td>${F(m.p)}</td><td><input type='number' min='0' data-pa='${m.id}' value='${v}' style='width:100px'></td><td id='pm${m.id}'>${mg}</td></tr>`}),'Aucun produit.');
+$('#main').addEventListener('input',e=>{const t=e.target;
+ if(t.id==='paq'){const v=t.value.toLowerCase();document.querySelectorAll('#main tr[data-n]').forEach(r=>r.hidden=!r.dataset.n.includes(v))}
+ else if(t.dataset.pa){const m=D.meds.find(x=>x.id===+t.dataset.pa);pq[m.id]=t.value;document.getElementById('pm'+m.id).textContent=t.value!==''&&m.p?Math.round((m.p-t.value)/m.p*100)+' %':''}});
 const BH=['Période','Recettes','Achats de marchandises','Salaires','Autres dépenses','Bénéfice net'];
 const ben=()=>{const{R,T,lab}=benef();
- return `<div class='bar'><button class='b ${bm==='mois'?'':'g'}' data-bm='mois'>Bénéfices mensuels</button><button class='b ${bm==='an'?'':'g'}' data-bm='an'>Bénéfices annuels</button>${bm==='mois'?`<input type='number' id='bk' value='${bk}' min='2020' max='2100' style='width:100px'>`:''}<button class='b g' id='pbn'>Imprimer</button></div><section class='st'><div class='k'><b>${F(T.r)}</b><span>Recettes</span></div><div class='k'><b>${F(T.a+T.s+T.o)}</b><span>Dépenses (achats, salaires, autres)</span></div><div class='k ${T.b<0?'e2':''}'><b>${F(T.b)}</b><span>Bénéfice net${bm==='mois'?' de '+bk:''}</span></div></section>`+table(BH,benRows(R,T,lab),'Aucune donnée.')+`<p style='color:var(--mu)'>Calcul sur l’argent réellement encaissé et dépensé : une vente à crédit compte quand le client paie, un achat de marchandises quand vous payez le fournisseur. Ce n’est pas une marge commerciale, car le prix d’achat de chaque produit n’est pas enregistré.</p>`};
+ return `<div class='bar'><button class='b ${bm==='mois'?'':'g'}' data-bm='mois'>Bénéfices mensuels</button><button class='b ${bm==='an'?'':'g'}' data-bm='an'>Bénéfices annuels</button>${bm==='mois'?`<input type='number' id='bk' value='${bk}' min='2020' max='2100' style='width:100px'>`:''}<button class='b g' id='pbn'>Imprimer</button></div><section class='st'><div class='k'><b>${F(T.r)}</b><span>Recettes</span></div><div class='k'><b>${F(T.a+T.s+T.o)}</b><span>Dépenses (achats, salaires, autres)</span></div><div class='k ${T.b<0?'e2':''}'><b>${F(T.b)}</b><span>Bénéfice net${bm==='mois'?' de '+bk:''}</span></div></section>`+table(BH,benRows(R,T,lab),'Aucune donnée.')+`<p style='color:var(--mu)'>Calcul sur l’argent réellement encaissé et dépensé : une vente à crédit compte quand le client paie, un achat de marchandises quand vous payez le fournisseur. Le tableau suivant donne la marge commerciale, calculée avec le prix d’achat des produits vendus.</p>`+((M)=>`<h3 style='margin:18px 0 8px'>Marge commerciale</h3>`+table(MH,mRows(M,lab).map(r=>`<tr>${r.map((c,i)=>`<td${i?'':` style='text-transform:capitalize'`}>${c}</td>`).join('')}</tr>`),'Aucune donnée.')+`<p style='color:var(--mu)'>Ventes comptabilisées au jour de la vente, moins le prix d’achat des produits vendus. Les achats de marchandises ne sont pas recomptés : le coût d’achat les remplace. ${M.nx?M.nx+' vente(s) sans prix d’achat ne sont pas comptées : renseignez-le dans l’onglet Prix d’achat.':''}</p>`)(marge())};
 function printBen(){
  const{R,T,lab}=benef(),tt=bm==='mois'?'BÉNÉFICES MENSUELS – '+bk:'BÉNÉFICES ANNUELS';
- const html=`<div style='font:13px sans-serif;color:#000'><div style='text-align:center'><h2 style='margin:0'>SAINT RÉGIS</h2>Kpètè-Maflo – Tél : 98844871 / 70309325<h3 style='margin:12px 0 2px'>${tt}</h3><small>Édité le ${new Date().toLocaleDateString('fr-FR')} par ${esc(me.n)}</small></div><table style='min-width:0;width:100%;border-collapse:collapse;margin-top:12px'><tr>${BH.map((h,i)=>`<th style='text-align:${i?'right':'left'};border-bottom:1px solid #000;font-size:12px'>${h}</th>`).join('')}</tr>${benRows(R,T,lab).join('').replace(/<td>/g,"<td style='padding:5px 3px;border-bottom:1px solid #999;text-align:right'>").replace(/<td style='text-transform:capitalize'>/g,"<td style='padding:5px 3px;border-bottom:1px solid #999;text-transform:capitalize'>")}</table><p style='margin-top:10px;font-size:12px'>Calcul sur l’argent encaissé et dépensé (hors marge commerciale).</p><p style='margin-top:30px'>Signature : ____________</p></div>`;
+ const html=`<div style='font:13px sans-serif;color:#000'><div style='text-align:center'><h2 style='margin:0'>SAINT RÉGIS</h2>Kpètè-Maflo – Tél : 98844871 / 70309325<h3 style='margin:12px 0 2px'>${tt}</h3><small>Édité le ${new Date().toLocaleDateString('fr-FR')} par ${esc(me.n)}</small></div><table style='min-width:0;width:100%;border-collapse:collapse;margin-top:12px'><tr>${BH.map((h,i)=>`<th style='text-align:${i?'right':'left'};border-bottom:1px solid #000;font-size:12px'>${h}</th>`).join('')}</tr>${benRows(R,T,lab).join('').replace(/<td>/g,"<td style='padding:5px 3px;border-bottom:1px solid #999;text-align:right'>").replace(/<td style='text-transform:capitalize'>/g,"<td style='padding:5px 3px;border-bottom:1px solid #999;text-transform:capitalize'>")}</table><h4 style='margin:14px 0 4px'>Marge commerciale</h4><table style='min-width:0;width:100%;border-collapse:collapse'><tr>${MH.map((h,i)=>`<th style='text-align:${i?'right':'left'};border-bottom:1px solid #000;font-size:11px'>${h}</th>`).join('')}</tr>${mRows(marge(),lab).map(r=>`<tr>${r.map((c,i)=>`<td style='padding:4px 3px;border-bottom:1px solid #999;font-size:12px;text-align:${i?'right':'left'};${i?'':'text-transform:capitalize'}'>${c}</td>`).join('')}</tr>`).join('')}</table><p style='margin-top:10px;font-size:12px'>Premier tableau : argent encaissé et dépensé. Second tableau : marge calculée avec le prix d’achat des produits vendus.</p><p style='margin-top:30px'>Signature : ____________</p></div>`;
  $('#rpb').innerHTML=html;
  $('#rpp').onclick=()=>{try{window.print()}catch(e){}};
  $('#rps').onclick=async()=>{const dl=window.claude?await claude.use('downloads'):null;if(dl)try{await dl.save({filename:'benefices-'+(bm==='mois'?bk:'annuels')+'.html',data:new Blob([`<!doctype html><meta charset=utf-8><title>Bénéfices</title><body style='max-width:190mm;margin:auto'>${html}`],{type:'text/html'})})}catch(e){}};
@@ -287,7 +303,7 @@ document.body.insertAdjacentHTML('beforeend',`<dialog id='gd'><form method='dial
 
 const adm=()=>me&&me.r==='admin';
 const nm=(a,id)=>(D[a].find(x=>x.id===id)||{n:'(supprimé)'}).n;
-const TABS=[['stock','Stock'],['vente','Vente'],['hist','Historique'],['cli','Clients'],['rx','Ordonnances'],['cons','Consultations'],['ana','Analyses'],['ord','Commandes',1],['sup','Fournisseurs',1],['jr','Journal',1],['inv','Inventaire',1],['tres','Trésorerie',1],['rap','Rapport',1],['ben','Bénéfices',1],['cre','Créances',1],['paie','Salaires',1],['team','Équipe',1]];
+const TABS=[['stock','Stock'],['vente','Vente'],['hist','Historique'],['cli','Clients'],['rx','Ordonnances'],['cons','Consultations'],['ana','Analyses'],['ord','Commandes',1],['sup','Fournisseurs',1],['jr','Journal',1],['inv','Inventaire',1],['pa','Prix d’achat',1],['tres','Trésorerie',1],['rap','Rapport',1],['ben','Bénéfices',1],['cre','Créances',1],['paie','Salaires',1],['team','Équipe',1]];
 function ask(title,fields,cb,ok='Enregistrer'){
  $('#gf').innerHTML=`<h3 style='margin:0 0 6px'>${title}</h3>`+fields.map((f,i)=>`<label>${f.l}</label>`+(f.o?`<select id='g${i}'>${f.o.map(o=>`<option value='${o[0]}'>${esc(o[1])}</option>`).join('')}</select>`:`<input id='g${i}' type='${f.t||'text'}' ${f.t==='number'?'min='+(f.z?0:1):''} ${f.n?'':'required'}>`)).join('')+`<div style='display:flex;gap:8px;justify-content:flex-end;margin-top:14px'><button type='button' class='b g' id='gx'>Annuler</button><button class='b'>${ok}</button></div>`;
  $('#gx').onclick=()=>$('#gd').close();
@@ -341,7 +357,7 @@ function render(){
  $('#who').textContent=me?me.n+(adm()?' (administrateur)':' (vendeur)'):'';
  if(!me){$('#st').innerHTML='';$('#nav').innerHTML='';$('#main').innerHTML=`<div class='pn em'>${boot}</div>`;return}
  $('#nav').innerHTML=TABS.filter(t=>!t[2]||adm()).map(t=>`<button data-v='${t[0]}' class='${t[0]===view?'on':''}'>${t[1]}</button>`).join('');
- $('#main').innerHTML={stock,vente,hist,cli,rx,ord,sup,eq,jr,inv,tres,rap,cre,cons,ana,team,paie,ben}[view]();
+ $('#main').innerHTML={stock,vente,hist,cli,rx,ord,sup,eq,jr,inv,tres,rap,cre,cons,ana,team,paie,ben,pa}[view]();
  const s=$('#sq')||$('#vq');
  if(s)s.oninput=e=>{q=e.target.value;const p=e.target.selectionStart;render();const n=$('#sq')||$('#vq');n.focus();n.setSelectionRange(p,p)};
 }
@@ -349,11 +365,11 @@ $('#nav').onclick=e=>{if(e.target.dataset.v){view=e.target.dataset.v;q='';render
 function open(id){
  editId=id;const m=D.meds.find(x=>x.id===id)||{n:'',c:'Antalgique',q:'',s:10,p:'',e:''};
  $('#dt').textContent=id?'Modifier le médicament':'Ajouter un médicament';
- f_n.value=m.n;f_c.value=m.c;f_q.value=m.q;f_s.value=m.s;f_p.value=m.p;f_e.value=m.e;$('#dlg').showModal();
+ f_n.value=m.n;f_c.value=m.c;f_q.value=m.q;f_s.value=m.s;f_p.value=m.p;f_a.value=m.a??'';f_e.value=m.e;$('#dlg').showModal();
 }
 $('#cx').onclick=()=>$('#dlg').close();
 $('#fm').onsubmit=e=>{
- const o={n:f_n.value.trim(),c:f_c.value,q:+f_q.value,s:+f_s.value,p:+f_p.value,e:f_e.value};
+ const o={n:f_n.value.trim(),c:f_c.value,q:+f_q.value,s:+f_s.value,p:+f_p.value,e:f_e.value,...(f_a.value!==''?{a:+f_a.value}:{})};
  {const id=editId||nid();put('meds',id,{id,...o});log(editId?'Médicament modifié':'Médicament ajouté',`${o.n} (stock ${o.q}, prix ${o.p})`)}
  save();render();
 };
@@ -363,10 +379,10 @@ $('#main').onclick=e=>{
  else if(g('ed'))open(g('ed'));
  else if(g('del')){const i=g('del');yes('Supprimer ce médicament ?',()=>{log('Médicament supprimé',nm('meds',i));dele('meds',i)})}
  else if(g('add')){const m=D.meds.find(x=>x.id===g('add')),c=cart.find(x=>x.id===m.id);
-  if(c){c.k=Math.min(c.k+1,c.max)}else cart.push({id:m.id,n:m.n,p:m.p,k:1,max:m.q});render()}
+  if(c){c.k=Math.min(c.k+1,c.max)}else cart.push({id:m.id,n:m.n,p:m.p,k:1,max:m.q,a:m.a});render()}
  else if(g('rm')){cart=cart.filter(c=>c.id!==g('rm'));render()}
  else if(t.id==='pay'){if(cr&&!cl)return ask('Choisissez un client pour une vente à crédit',[],()=>{},'OK');
-  const items=cart.map(c=>({n:c.n,k:c.k,p:c.p}));
+  const items=cart.map(c=>({n:c.n,k:c.k,p:c.p,...(c.a!=null?{a:c.a}:{})}));
   cart.forEach(c=>adj(c.id,-c.k));
   {const id=nid();const sl={id,d:new Date().toISOString(),i:items,t:items.reduce((a,i)=>a+i.p*i.k,0),u:me.n,c:cl,cr:cr?1:0};put('sales',id,sl);log(cr?'Vente à crédit':'Vente',F(sl.t));if(cr){const k=nid();put('cre',k,{id:k,c:cl,s:id,d:sl.d,m:sl.t,r:sl.t,u:me.n,l:items.map(i=>i.n+' ×'+i.k).join(', ')})}receipt(sl)}cl=0;cr=false;
   cart=[];save();render();
@@ -415,7 +431,7 @@ $('#main').addEventListener('click',e=>{
  else if(d.rec){const o=D.ord.find(x=>x.id===+d.rec);upd('ord',o.id,{ok:1});log('Commande reçue',nm('meds',o.m)+' ×'+o.k);adj(o.m,o.k)}
  else if(d.dlv){const r=D.rx.find(x=>x.id===+d.dlv),m=D.meds.find(x=>x.id===r.m);
   if(!m||m.q<r.k)ask('Stock insuffisant pour délivrer cette ordonnance',[],()=>{},'OK');
-  else{adj(m.id,-r.k);upd('rx',r.id,{ok:1});log('Ordonnance délivrée',nm('cli',r.c));const id=nid();const sl={id,d:new Date().toISOString(),i:[{n:m.n,k:r.k,p:m.p}],t:m.p*r.k,u:me.n,c:r.c};put('sales',id,sl);receipt(sl)}}
+  else{adj(m.id,-r.k);upd('rx',r.id,{ok:1});log('Ordonnance délivrée',nm('cli',r.c));const id=nid();const sl={id,d:new Date().toISOString(),i:[{n:m.n,k:r.k,p:m.p,...(m.a!=null?{a:m.a}:{})}],t:m.p*r.k,u:me.n,c:r.c};put('sales',id,sl);receipt(sl)}}
  else if(d.rc)receipt(D.sales.find(x=>x.id===+d.rc));
  else if(d.xs){const s=D.sales.find(x=>x.id===+d.xs),c=D.cre.find(x=>x.s===s.id);
   if(c&&c.r<c.m)ask('Cette vente à crédit a déjà été en partie réglée. Annulez d’abord les règlements dans la Trésorerie.',[],()=>{},'OK');
@@ -432,6 +448,9 @@ $('#main').addEventListener('click',e=>{
  else if(d.psl){const p=D.per.find(x=>x.id===+d.psl);yes(`Payer le salaire de ${esc(p.n)} (${F(p.m)}) pour ${pm} ? Une dépense sera enregistrée dans la Trésorerie.`,()=>{const i=nid(),k=nid(),dt=new Date().toISOString();put('sal',i,{id:i,p:p.id,n:p.n,mo:pm,m:p.m,d:dt,u:me.n,t:k});put('tres',k,{id:k,d:dt,t:'out',l:'Salaire : '+p.n+' – '+pm,m:p.m,u:me.n});log('Salaire payé',p.n+' – '+pm+' : '+F(p.m))})}
  else if(d.bon)bon([D.ord.find(x=>x.id===+d.bon)],'FICHE DE COMMANDE');
  else if(id==='bonall')bon(D.ord.filter(o=>!o.ok),'COMMANDES EN ATTENTE');
+ else if(id==='pasv'){const ch=D.meds.filter(m=>pq[m.id]!==undefined&&pq[m.id]!==''&&+pq[m.id]!==m.a);
+  if(!ch.length)ask('Aucun prix d’achat à enregistrer',[],()=>{},'OK');
+  else yes(`Enregistrer ${ch.length} prix d’achat ?`,()=>{ch.forEach(m=>upd('meds',m.id,{a:+pq[m.id]}));log('Prix d’achat mis à jour',ch.length+' produit(s)');pq={};render()})}
  else if(d.bm){bm=d.bm;render()}
  else if(id==='pbn')printBen();
  else if(id==='lcm')listeCmd();
