@@ -296,7 +296,21 @@ const rap=()=>{const r=rpt();
  return `<div class='bar'><button class='b ${rm==='mois'?'':'g'}' data-rp='mois'>Rapport mensuel</button><button class='b ${rm==='an'?'':'g'}' data-rp='an'>Rapport annuel</button>${rm==='mois'?`<input type='month' id='rk' value='${rk}'>`:`<input type='number' id='rk' value='${rk}' min='2020' max='2100' style='width:100px'>`}<button class='b g' id='xrp'>Exporter ce rapport</button><button class='b' id='prp'>Imprimer ce rapport</button></div><section class='st'><div class='k'><b>${F(r.ca)}</b><span>Chiffre d’affaires (${r.nb} ventes)</span></div><div class='k'><b>${F(r.en)}</b><span>Autres entrées</span></div><div class='k'><b>${F(r.ach)}</b><span>Achats de marchandises payés</span></div><div class='k'><b>${F(r.ou-r.ach)}</b><span>Autres dépenses</span></div><div class='k ${r.res<0?'e2':''}'><b>${F(r.res)}</b><span>Résultat de la période</span></div></section>`
  +table([rm==='mois'?'Jour':'Mois','Ventes','Entrées','Dépenses','Résultat'],r.rows.map(x=>`<tr><td>${x.k}</td><td>${F(x.v)}</td><td>${F(x.e)}</td><td>${F(x.o)}</td><td><b>${F(x.v+x.e-x.o)}</b></td></tr>`),'Aucune activité sur cette période.')
  +`<h3 style='margin:18px 0 8px'>Produits les plus vendus</h3>`+table(['Produit','Quantité vendue','Montant'],r.top.map(p=>`<tr><td>${esc(p.n)}</td><td>${p.k}</td><td>${F(p.t)}</td></tr>`),'Aucune vente.')};
-const jr=()=>table(['Date','Employé','Action','Détail'],[...D.journal].reverse().slice(0,300).map(j=>`<tr><td>${new Date(j.d).toLocaleString('fr-FR')}</td><td>${esc(j.u)}</td><td><b>${esc(j.a)}</b></td><td>${esc(j.t)}</td></tr>`),'Aucune entrée dans le journal.');
+const JC=[['Ventes',/^(Vente|Annulation de vente)/],['Stock',/^(M\u00e9dicament|Mouvement de stock|Inventaire|Prix d\u2019achat)/],['Consultations',/onsultation/],['Analyses',/nalyses/],['Ordonnances',/^Ordonnance/],['Commandes et fournisseurs',/^(Commande|Fournisseur|Suppression \(sup\))/],['Clients et cr\u00e9ances',/^(Client|Cr\u00e9ance|R\u00e8glement de cr\u00e9ance|Suppression \(cli\))/],['Tr\u00e9sorerie',/^(D\u00e9pense|Entr\u00e9e de caisse|Mouvement de caisse|Cl\u00f4ture)/],['Salaires',/alaire|^Employ\u00e9/]];
+const jcat=a=>(JC.find(c=>c[1].test(a))||['Autres'])[0];
+let jc='Tous';
+const JV={vente:'Ventes',hist:'Ventes',stock:'Stock',pa:'Stock',inv:'Stock',cons:'Consultations',ana:'Analyses',rx:'Ordonnances',ord:'Commandes et fournisseurs',sup:'Commandes et fournisseurs',cli:'Clients et cr\u00e9ances',cre:'Clients et cr\u00e9ances',tres:'Tr\u00e9sorerie',paie:'Salaires'};
+const jlist=()=>jc==='Tous'?D.journal:D.journal.filter(j=>jcat(j.a)===jc);
+const jr=()=>{const all=D.journal,cnt=n=>all.filter(j=>jcat(j.a)===n).length;
+ return `<div class='bar' style='gap:6px'>${[['Tous',all.length],...JC.map(c=>[c[0],cnt(c[0])]),['Autres',cnt('Autres')]].filter(x=>x[0]==='Tous'||x[1]).map(x=>`<button class='b ${jc===x[0]?'':'g'} s' data-jc='${x[0]}'>${x[0]} (${x[1]})</button>`).join('')}<button class='b g s' id='pjr'>Imprimer ce journal</button></div>`+table(['Date','Employ\u00e9','Action','D\u00e9tail'],[...jlist()].reverse().slice(0,300).map(j=>`<tr><td>${new Date(j.d).toLocaleString('fr-FR')}</td><td>${esc(j.u)}</td><td><b>${esc(j.a)}</b></td><td>${esc(j.t)}</td></tr>`),'Aucune entr\u00e9e dans ce journal.')};
+function printJr(){
+ const L=[...jlist()].reverse().slice(0,500),th=t=>`<th style='text-align:left;border-bottom:1px solid #000;font-size:12px'>${t}</th>`,td=t=>`<td style='padding:4px 3px;border-bottom:1px solid #999;font-size:12px'>${t}</td>`;
+ const html=`<div style='font:13px sans-serif;color:#000'><div style='text-align:center'><h2 style='margin:0'>SAINT R\u00c9GIS</h2>Kp\u00e8t\u00e8-Maflo \u2013 T\u00e9l : 98844871 / 70309325<h3 style='margin:12px 0 2px'>JOURNAL \u2013 ${esc(jc.toUpperCase())}</h3><small>\u00c9dit\u00e9 le ${new Date().toLocaleDateString('fr-FR')} par ${esc(me.n)} \u2013 ${L.length} entr\u00e9e(s)</small></div><table style='min-width:0;width:100%;border-collapse:collapse;margin-top:12px'><tr>${['Date','Employ\u00e9','Action','D\u00e9tail'].map(th).join('')}</tr>${L.map(j=>`<tr>${td(new Date(j.d).toLocaleString('fr-FR'))}${td(esc(j.u))}${td('<b>'+esc(j.a)+'</b>')}${td(esc(j.t))}</tr>`).join('')}</table></div>`;
+ $('#rpb').innerHTML=html;
+ $('#rpp').onclick=()=>{try{window.print()}catch(e){}};
+ $('#rps').onclick=async()=>{const dl=window.claude?await claude.use('downloads'):null;if(dl)try{await dl.save({filename:'journal.html',data:new Blob([`<!doctype html><meta charset=utf-8><title>Journal</title><body style='max-width:190mm;margin:auto'>${html}`],{type:'text/html'})})}catch(e){}};
+ $('#rpd').showModal();
+}
 async function adj(id,dl){try{const s=await ref('meds',id).get();if(s.exists){const n=Math.max(0,s.data().q+dl);await ref('meds',id).update({q:n});log('Mouvement de stock',`${s.data().n} : ${dl>0?'+':''}${dl} (reste ${n})`)}}catch(e){er(e)}}
 document.querySelector('header').innerHTML=`<h1>SAINT RÉGIS</h1><div style='display:flex;gap:8px;align-items:center;flex-wrap:wrap'><span id='who'></span><button class='b g s' id='xl'>Exporter Excel</button></div>`;
 document.body.insertAdjacentHTML('beforeend',`<dialog id='gd'><form method='dialog' id='gf'></form></dialog>`);
@@ -358,6 +372,7 @@ function render(){
  if(!me){$('#st').innerHTML='';$('#nav').innerHTML='';$('#main').innerHTML=`<div class='pn em'>${boot}</div>`;return}
  $('#nav').innerHTML=TABS.filter(t=>!t[2]||adm()).map(t=>`<button data-v='${t[0]}' class='${t[0]===view?'on':''}'>${t[1]}</button>`).join('');
  $('#main').innerHTML={stock,vente,hist,cli,rx,ord,sup,eq,jr,inv,tres,rap,cre,cons,ana,team,paie,ben,pa}[view]();
+ if(adm()&&JV[view])$('#main').insertAdjacentHTML('afterbegin',`<div style='text-align:right;margin:0 0 6px'><button class='b g s' data-jv='${JV[view]}'>Journal : ${JV[view]}</button></div>`);
  const s=$('#sq')||$('#vq');
  if(s)s.oninput=e=>{q=e.target.value;const p=e.target.selectionStart;render();const n=$('#sq')||$('#vq');n.focus();n.setSelectionRange(p,p)};
 }
@@ -410,7 +425,7 @@ $('#xl').onclick=async()=>{
  add('Créances',D.cre.map(x=>({Date:x.d,Client:nm('cli',x.c),Détail:x.l,Montant:x.m,'Reste dû':x.r})));
  add('Clôtures',D.clo.map(c=>({Date:c.day,Fond:c.fl,Théorique:c.th,Compté:c.cp,Écart:c.e,Employé:c.u})));
  add('Trésorerie',D.tres.map(x=>({Date:x.d,Type:x.t==='in'?'Entrée':'Dépense',Libellé:x.l,Montant:x.m,Employé:x.u})));
- add('Journal',D.journal.map(j=>({Date:j.d,Employé:j.u,Action:j.a,Détail:j.t})));
+ add('Journal',D.journal.map(j=>({Date:j.d,Employé:j.u,Activité:jcat(j.a),Action:j.a,Détail:j.t})));
  const buf=XLSX.write(wb,{type:'array',bookType:'xlsx'});
  try{await dl.save({filename:'pharmacie-'+today+'.xlsx',data:new Blob([buf])})}catch(e){}
 };
@@ -451,6 +466,9 @@ $('#main').addEventListener('click',e=>{
  else if(id==='pasv'){const ch=D.meds.filter(m=>pq[m.id]!==undefined&&pq[m.id]!==''&&+pq[m.id]!==m.a);
   if(!ch.length)ask('Aucun prix d’achat à enregistrer',[],()=>{},'OK');
   else yes(`Enregistrer ${ch.length} prix d’achat ?`,()=>{ch.forEach(m=>upd('meds',m.id,{a:+pq[m.id]}));log('Prix d’achat mis à jour',ch.length+' produit(s)');pq={};render()})}
+ else if(d.jv){jc=d.jv;view='jr';render()}
+ else if(d.jc){jc=d.jc;render()}
+ else if(id==='pjr')printJr();
  else if(d.bm){bm=d.bm;render()}
  else if(id==='pbn')printBen();
  else if(id==='lcm')listeCmd();
